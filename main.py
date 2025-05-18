@@ -40,8 +40,8 @@ def generate_fortune(user_text):
     )
     result = response["choices"][0]["message"]["content"]
 
-    # 読点「、」の後に改行を入れる（見やすく）
-    formatted = result.replace("、", "、\n")
+    # 「、」と「。」のあとに改行を入れて、LINEでも見やすく
+    formatted = result.replace("、", "、\n").replace("。", "。\n")
     return formatted.strip()
 
 
