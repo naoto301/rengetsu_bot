@@ -40,11 +40,6 @@ def generate_fortune(user_text):
     )
     return response["choices"][0]["message"]["content"]
 
-# 恋愛占いっぽい内容かを判定する関数
-def is_fortune_related(text):
-    keywords = ["恋", "未来", "運命", "相手", "復縁", "縁", "出会い", "別れ", "相性", "付き合", "好き", "気になる", "結婚"]
-    return any(kw in text for kw in keywords)
-
 @app.route("/webhook", methods=["POST"])
 def webhook():
     body = request.json
@@ -52,16 +47,16 @@ def webhook():
         if event["type"] == "message" and event["message"]["type"] == "text":
             user_text = event["message"]["text"]
             reply_token = event["replyToken"]
+            user_id = event["source"]["userId"]
 
-            if is_fortune_related(user_text):
-                result = generate_fortune(user_text)
-            else:
-                result = "ふふ…れんげつに占ってほしいことがあれば、恋の話をしてみてくださいね♡"
+            # 👇 ここでユーザーIDをログに出す
+            print(f"ユーザーID: {user_id}")
 
+            result = generate_fortune(user_text)
             reply_to_line(reply_token, result)
     return "OK"
 
-# Render用ポートバインド対応
+# Render用ポートバインド
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
