@@ -50,7 +50,7 @@ def webhook():
             user_id = event["source"]["userId"]
 
             # 👇 ここでユーザーIDをログに出す
-            print(f"ユーザーID: {user_id}")
+            print(f"ユーザーID: {user_id}") 
 
             result = generate_fortune(user_text)
             reply_to_line(reply_token, result)
