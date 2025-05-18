@@ -38,7 +38,12 @@ def generate_fortune(user_text):
         messages=[{"role": "user", "content": prompt}],
         max_tokens=150
     )
-    return response["choices"][0]["message"]["content"]
+    result = response["choices"][0]["message"]["content"]
+
+    # 読点「、」の後に改行を入れる（見やすく）
+    formatted = result.replace("、", "、\n")
+    return formatted.strip()
+
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
