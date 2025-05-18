@@ -42,19 +42,26 @@ def generate_fortune(user_text):
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
+    print("📩 Webhook受信した")
+
     body = request.json
-    for event in body["events"]:
+    print(f"受信内容: {body}")  # ← これで中身丸ごと見る
+
+    for event in body.get("events", []):
+        print(f"▶ イベント種別: {event['type']}")
+        
         if event["type"] == "message" and event["message"]["type"] == "text":
             user_text = event["message"]["text"]
             reply_token = event["replyToken"]
             user_id = event["source"]["userId"]
 
-            # 👇 ここでユーザーIDをログに出す
-            print(f"ユーザーID: {user_id}") 
+            print(f"✅ ユーザーID: {user_id}")
+            print(f"💬 メッセージ内容: {user_text}")
 
             result = generate_fortune(user_text)
             reply_to_line(reply_token, result)
     return "OK"
+
 
 # Render用ポートバインド
 if __name__ == "__main__":
