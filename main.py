@@ -49,10 +49,14 @@ def webhook():
             reply_token = event["replyToken"]
             user_id = event["source"]["userId"]
 
-            # 👇 ここでユーザーIDをメッセージとして返信する
-            reply_to_line(reply_token, f"あなたのユーザーIDは\n{user_id}\nです。スプレッドシートに貼ってね。")
+            # ユーザーIDはログに出すだけ（Push用に）
+            print(f"ユーザーID: {user_id}")
+            print(f"メッセージ: {user_text}")
 
+            result = generate_fortune(user_text)
+            reply_to_line(reply_token, result)
     return "OK"
+
 
 
 # Render用ポートバインド
