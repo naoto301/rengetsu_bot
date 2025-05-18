@@ -1,4 +1,4 @@
 flask
 requests
 python-dotenv
-openai==0.28.1  ←ここだけ追加・バージョン固定
+openai==0.28.1
