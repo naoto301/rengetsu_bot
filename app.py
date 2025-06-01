@@ -34,7 +34,7 @@ def callback():
 def handle_message(event):
     user_id = event.source.user_id
     user_message = event.message.text.strip()
-    
+
     # キーワード変換（占いモード）
     if user_message == '金運':
         user_message = '私の金運について霊視してください。'
@@ -49,20 +49,28 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=name_response))
         return
 
-    # プレミアム登録
+    # ★ プレミアム登録処理（ここ修正済み）
     if user_message.startswith("コード："):
-     code = user_message.replace("コード：", "").strip()
-     utils.register_premium(user_id, code)
+        code = user_message.replace("コード：", "").strip()
+        utils.register_premium(user_id, code)
 
-    # 再取得して name を正しく反映
-    user_data = utils.get_user_data(user_id)
-    name = user_data.get("name", "あなた")
+        user_data = utils.get_user_data(user_id)
+        name = user_data.get("name", "あなた")
 
-    line_bot_api.reply_message(
-        event.reply_token,
-        TextSendMessage(text=f"✅ プレミアム登録が完了しました、{name}さん。深層の霊視を開始します。")
-    )
-    return
+        # プレミアム登録メッセージ
+        intro_msg = f"✅ プレミアム登録が完了しました{name + 'さん' if name else ''}。深層の霊視を開始します。"
+        
+        # GPT応答（深層霊視）
+        reply = gpt.get_gpt4_response(user_id, user_message, name)
+
+        line_bot_api.reply_message(
+            event.reply_token,
+            [
+                TextSendMessage(text=intro_msg),
+                TextSendMessage(text=reply)
+            ]
+        )
+        return
 
     # 無料上限チェック
     user_data = utils.get_user_data(user_id)
@@ -87,6 +95,7 @@ def handle_message(event):
 
     # 応答送信
     line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+
 
 
 @app.route("/", methods=["GET"])
