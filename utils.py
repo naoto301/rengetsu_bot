@@ -18,7 +18,10 @@ def save_json(file_path, data):
 
 def get_user_data(user_id):
     users = load_json(DATA_FILE)
-    return users.get(user_id, {"count": 0, "name": None})
+    if user_id not in users:
+        users[user_id] = {"count": 0, "name": None}
+        save_json(DATA_FILE, users)
+    return users[user_id]
 
 def update_user_data(user_id, data):
     users = load_json(DATA_FILE)
