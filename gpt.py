@@ -14,11 +14,22 @@ def get_gpt35_response(user_message, name):
     return response.choices[0].message.content
 
 def get_gpt4_response(user_id, user_message, name):
-    response = client.chat.completions.create(
+    prompt = f"""
+{name}さんからの依頼：{user_message}
+
+【条件】
+・優しく語りかける
+・長文にしない（2〜3文以内）
+・必要なことだけ簡潔に
+"""
+
+    response = openai.ChatCompletion.create(
         model="gpt-4",
         messages=[
-            {"role": "system", "content": f"あなたは霊視占い師『恋月れんげつ』です。特に深層心理と霊的エネルギーに基づいたアドバイスが得意です。クライアントは{name}さんです。"},
-            {"role": "user", "content": user_message}
-        ]
+            {"role": "system", "content": "あなたは優しく霊視を伝える霊能者です。"},
+            {"role": "user", "content": prompt}
+        ],
+        max_tokens=200,  # ← 多すぎたら100〜150にしてもいい
+        temperature=0.8
     )
-    return response.choices[0].message.content
+    return response.choices[0].message["content"].strip()
