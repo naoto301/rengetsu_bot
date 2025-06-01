@@ -84,4 +84,6 @@ def handle_message(event):
 @app.route("/", methods=["GET"])
 def health():
     return "れんげつBot起動中"
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=10000)
 
