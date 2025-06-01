@@ -1,21 +1,36 @@
 from flask import Flask, request, abort
-import json
-import utils
-import gpt
-
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
-
+import requests
 import os
 
 app = Flask(__name__)
 
-LINE_CHANNEL_ACCESS_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN", "YOUR_LINE_TOKEN_HERE")
-LINE_CHANNEL_SECRET = os.environ.get("LINE_CHANNEL_SECRET", "YOUR_LINE_SECRET_HERE")
+LINE_CHANNEL_ACCESS_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
+LINE_CHANNEL_SECRET = os.environ.get("LINE_CHANNEL_SECRET")
+GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyEXAMPLE/exec"  # ← あなたのGASデプロイURLに置き換えてください
 
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
+
+def get_user_data(user_id):
+    response = requests.get(GAS_WEB_APP_URL, params={"action": "get", "user_id": user_id})
+    return response.json() if response.status_code == 200 else {}
+
+def save_user_data(user_id, name, count, is_premium):
+    payload = {
+        "action": "save",
+        "user_id": user_id,
+        "name": name,
+        "count": count,
+        "is_premium": is_premium
+    }
+    requests.post(GAS_WEB_APP_URL, data=payload)
+
+@app.route("/")
+def home():
+    return "ok"
 
 @app.route("/callback", methods=['POST'])
 def callback():
@@ -30,67 +45,27 @@ def callback():
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
     user_id = event.source.user_id
-    user_message = event.message.text.strip()
+    msg = event.message.text.strip()
 
-    # 占いキーワード変換
-    if user_message == '金運':
-        user_message = '私の金運について霊視してください。'
-    elif user_message == '恋愛運':
-        user_message = '私の恋愛運について霊視してください。'
-    elif user_message == '仕事運':
-        user_message = '私の仕事運について霊視してください。'
+    user_data = get_user_data(user_id)
+    name = user_data.get("name", None)
+    count = int(user_data.get("count", 0))
+    is_premium = user_data.get("is_premium", "false") == "true"
 
-    # ✅ 名前登録チェック（登録後に再取得）
-    name_response = utils.detect_and_register_name(user_id, user_message)
-    if name_response:
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=name_response))
-        return
+    reply = ""
 
-    # ✅ プレミアム登録処理
-    if user_message.startswith("コード："):
-        code = user_message.replace("コード：", "").strip()
-        utils.register_premium(user_id, code)
-        user_data = utils.get_user_data(user_id)  # ← ここで再取得
-        name = user_data.get("name", "あなた")
-
-        intro_msg = f"✅ プレミアム登録が完了しました{name + 'さん' if name else ''}。深層の霊視を開始します。"
-        reply = gpt.get_gpt4_response(user_id, user_message, name)
-        line_bot_api.reply_message(event.reply_token, [
-            TextSendMessage(text=intro_msg),
-            TextSendMessage(text=reply)
-        ])
-        return
-
-    # ユーザーデータ取得＆プレミアム判定
-    user_data = utils.get_user_data(user_id)
-    is_premium = utils.is_premium_user(user_id)
-
-    # 無料上限チェック
-    if not is_premium and user_data['count'] >= 10:
-        line_bot_api.reply_message(
-            event.reply_token,
-            TextSendMessage(text="🔒 無料霊視は10通までです。続きはこちら👇\nhttps://note.com/loyal_cosmos1726/m/magazine_id")
-        )
-        return
-
-    # カウント加算（無料のみ）
-    if not is_premium:
-        utils.increment_user_count(user_id)
-
-    # ✅ 名前を取得し直して常に最新化
-    name = user_data.get("name", "あなた")
-    if is_premium:
-        reply = gpt.get_gpt4_response(user_id, user_message, name)
+    if msg.startswith("名前は"):
+        name = msg.replace("名前は", "").strip()
+        reply = f"{name}さんって呼べばいいの？♡"
+    elif msg == "プレミアム登録":
+        is_premium = True
+        reply = "プレミアム登録が完了しました♡"
     else:
-        reply = gpt.get_gpt35_response(user_message, name)
+        count += 1
+        if not is_premium and count > 20:
+            reply = "ごめんね、20通以上はプレミアム登録してね♡"
+        else:
+            reply = f"{name}さん、お話してくれてうれしいな♡" if name else "名前教えてくれたら、もっと仲良くなれるかも♡"
 
-    # 応答送信
+    save_user_data(user_id, name, count, is_premium)
     line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
-
-@app.route("/", methods=["GET"])
-def health():
-    return "れんげつBot起動中"
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
-
