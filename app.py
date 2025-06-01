@@ -51,10 +51,18 @@ def handle_message(event):
 
     # プレミアム登録
     if user_message.startswith("コード："):
-        code = user_message.replace("コード：", "").strip()
-        utils.register_premium(user_id, code)
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="✅ プレミアム登録が完了しました。深層の霊視を開始します。"))
-        return
+    code = user_message.replace("コード：", "").strip()
+    utils.register_premium(user_id, code)
+
+    # 再取得して name を正しく反映
+    user_data = utils.get_user_data(user_id)
+    name = user_data.get("name", "あなた")
+
+    line_bot_api.reply_message(
+        event.reply_token,
+        TextSendMessage(text=f"✅ プレミアム登録が完了しました、{name}さん。深層の霊視を開始します。")
+    )
+    return
 
     # 無料上限チェック
     user_data = utils.get_user_data(user_id)
