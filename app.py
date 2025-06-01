@@ -1,71 +1,106 @@
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
-from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
 import requests
 import os
 
 app = Flask(__name__)
 
-LINE_CHANNEL_ACCESS_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
-LINE_CHANNEL_SECRET = os.environ.get("LINE_CHANNEL_SECRET")
-GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyEXAMPLE/exec"  # ← あなたのGASデプロイURLに置き換えてください
+# 環境変数（Renderに設定しておく）
+LINE_CHANNEL_ACCESS_TOKEN = os.environ["LINE_CHANNEL_ACCESS_TOKEN"]
+LINE_CHANNEL_SECRET = os.environ["LINE_CHANNEL_SECRET"]
+GAS_URL = os.environ["GAS_URL"]
 
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
-def get_user_data(user_id):
-    response = requests.get(GAS_WEB_APP_URL, params={"action": "get", "user_id": user_id})
-    return response.json() if response.status_code == 200 else {}
-
-def save_user_data(user_id, name, count, is_premium):
-    payload = {
-        "action": "save",
-        "user_id": user_id,
-        "name": name,
-        "count": count,
-        "is_premium": is_premium
-    }
-    requests.post(GAS_WEB_APP_URL, data=payload)
-
-@app.route("/")
-def home():
-    return "ok"
-
-@app.route("/callback", methods=['POST'])
+@app.route("/callback", methods=["POST"])
 def callback():
-    signature = request.headers['X-Line-Signature']
+    signature = request.headers["X-Line-Signature"]
     body = request.get_data(as_text=True)
+
     try:
         handler.handle(body, signature)
-    except InvalidSignatureError:
+    except Exception as e:
+        print(f"エラー: {e}")
         abort(400)
-    return 'OK'
+    return "OK"
 
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
     user_id = event.source.user_id
-    msg = event.message.text.strip()
+    user_msg = event.message.text.strip()
 
-    user_data = get_user_data(user_id)
-    name = user_data.get("name", None)
-    count = int(user_data.get("count", 0))
-    is_premium = user_data.get("is_premium", "false") == "true"
+    # GASへデータ送信
+    payload = {
+        "user_id": user_id,
+        "message": user_msg
+    }
+    try:
+        res = requests.post(GAS_URL, json=payload)
+        data = res.json()
+    except Exception as e:
+        print(f"GASエラー: {e}")
+        line_bot_api.reply_message(event.reply_token,
+            TextSendMessage(text="占い中に予期せぬエラーが起きました。時間を置いてお試しください。"))
+        return
 
-    reply = ""
+    # GASからの返却値
+    name = data.get("name", "")
+    count = data.get("count", 0)
+    premium = data.get("premium", False)
 
-    if msg.startswith("名前は"):
-        name = msg.replace("名前は", "").strip()
-        reply = f"{name}さんって呼べばいいの？♡"
-    elif msg == "プレミアム登録":
-        is_premium = True
-        reply = "プレミアム登録が完了しました♡"
-    else:
-        count += 1
-        if not is_premium and count > 20:
-            reply = "ごめんね、20通以上はプレミアム登録してね♡"
+    # プレミアム登録処理
+    if user_msg.startswith("プレミアムID:"):
+        premium_code = user_msg.replace("プレミアムID:", "").strip()
+        if premium_code == os.environ["PREMIUM_CODE"]:
+            requests.post(GAS_URL, json={
+                "user_id": user_id,
+                "premium_update": True
+            })
+            reply = "プレミアム登録を確認しました。引き続き、どうぞよろしくお願いします。"
         else:
-            reply = f"{name}さん、お話してくれてうれしいな♡" if name else "名前教えてくれたら、もっと仲良くなれるかも♡"
+            reply = "申し訳ありません。プレミアムIDが確認できませんでした。"
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+        return
 
-    save_user_data(user_id, name, count, is_premium)
-    line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+    # 名前登録
+    if not name:
+        reply = "はじめまして。お名前を教えていただけますか？"
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+        return
+
+    # 10通制限
+    if not premium and count > 10:
+        reply = "無料でのご相談は10通までとさせていただいております。\nご継続をご希望の場合はプレミアム登録をお願いいたします。"
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+        return
+
+    # GPT応答生成（ここは簡易化例）
+    prompt = f"{name}さんからのご相談：「{user_msg}」\nこの内容を霊視占い師として冷静に助言してください。"
+    try:
+        openai_key = os.environ["OPENAI_API_KEY"]
+        headers = {
+            "Authorization": f"Bearer {openai_key}",
+            "Content-Type": "application/json"
+        }
+        json_data = {
+            "model": "gpt-4",
+            "messages": [
+                {"role": "system", "content": "あなたは厳かで落ち着いた霊視占い師です。口調は冷静かつ敬意を持ち、距離を保ちながらも真摯に答えます。"},
+                {"role": "user", "content": prompt}
+            ]
+        }
+        res = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=json_data)
+        gpt_reply = res.json()["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        print(f"GPTエラー: {e}")
+        gpt_reply = "申し訳ありません。現在、霊視が不安定なようです。少し時間を置いてから再度お試しください。"
+
+    # 最終返信
+    final_reply = f"{name}さん、{gpt_reply}"
+    line_bot_api.reply_message(event.reply_token, TextSendMessage(text=final_reply))
+
+# Renderで必須：ポートバインド
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=10000)
