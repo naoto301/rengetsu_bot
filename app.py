@@ -51,8 +51,8 @@ def handle_message(event):
 
     # プレミアム登録
     if user_message.startswith("コード："):
-    code = user_message.replace("コード：", "").strip()
-    utils.register_premium(user_id, code)
+     code = user_message.replace("コード：", "").strip()
+     utils.register_premium(user_id, code)
 
     # 再取得して name を正しく反映
     user_data = utils.get_user_data(user_id)
