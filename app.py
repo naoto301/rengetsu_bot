@@ -25,9 +25,9 @@ def callback():
     return 'OK'
 
 def send_to_gas(user_id, user_name, message, is_premium):
-    url = "https://script.google.com/macros/s/AKfycbw8ZEOnqZHVcqfinlhxu4eMAs_Pdbwsapym6RFcAhGRod0_VcZVgspUzf70BgS0xAXg/exec"  # ← 差し替え必要
+    url = "https://script.google.com/macros/s/AKfycbw8ZEOnqZHVcqfinlhxu4eMAs_Pdbwsapym6RFcAhGRod0_VcZVgspUzf70BgS0xAXg/exec"
     headers = {
-        "Content-Type": "application/json"  # ← これが超重要
+        "Content-Type": "application/json"
     }
     payload = {
         "userId": user_id,
@@ -37,6 +37,7 @@ def send_to_gas(user_id, user_name, message, is_premium):
     }
     response = requests.post(url, headers=headers, data=json.dumps(payload))
     return response.text
+
 
 
 if __name__ == "__main__":
