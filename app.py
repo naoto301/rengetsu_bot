@@ -1,70 +1,42 @@
 from flask import Flask, request, abort
 import requests
-import os
 import json
-from linebot import LineBotApi, WebhookHandler
-from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, TextMessage, TextSendMessage
 
 app = Flask(__name__)
 
-# 環境変数
-LINE_CHANNEL_ACCESS_TOKEN = os.environ["LINE_CHANNEL_ACCESS_TOKEN"]
-LINE_CHANNEL_SECRET = os.environ["LINE_CHANNEL_SECRET"]
-GAS_URL = os.environ["GAS_URL"]
-
-line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
-handler = WebhookHandler(LINE_CHANNEL_SECRET)
-
-
 @app.route("/callback", methods=['POST'])
 def callback():
-    signature = request.headers['X-Line-Signature']
     body = request.get_data(as_text=True)
-
     try:
-        handler.handle(body, signature)
-    except InvalidSignatureError:
+        event = json.loads(body)["events"][0]
+        user_id = event["source"]["userId"]
+        message = event["message"]["text"]
+        user_name = "れんげつ様"  # 仮の固定名
+        is_premium = False  # 初期はfalse（GASで管理）
+
+        # GASに送信
+        gas_response = send_to_gas(user_id, user_name, message, is_premium)
+        print("GAS Response:", gas_response)
+
+    except Exception as e:
+        print("Error:", e)
         abort(400)
 
     return 'OK'
 
-
-@handler.add(MessageEvent, message=TextMessage)
-def handle_message(event):
-    user_id = event.source.user_id
-    user_message = event.message.text.strip()
-
-    # GASへ送信
-    payload = {
-        "user_id": user_id,
-        "message": user_message
+def send_to_gas(user_id, user_name, message, is_premium):
+    url = "https://script.google.com/macros/s/AKfycbw8ZEOnqZHVcqfinlhxu4eMAs_Pdbwsapym6RFcAhGRod0_VcZVgspUzf70BgS0xAXg/exec"  # ← 必ず差し替えろ
+    headers = {
+        "Content-Type": "application/json"
     }
-
-    try:
-        res = requests.post(GAS_URL, json=payload)
-        res_data = res.json()
-    except Exception:
-        line_bot_api.reply_message(
-            event.reply_token,
-            TextSendMessage(text="占い中に予期せぬエラーが起きました。時間を置いてお試しください。")
-        )
-        return
-
-    reply1 = res_data.get("reply1")
-    reply2 = res_data.get("reply2")
-
-    messages = [TextSendMessage(text=reply1)]
-    if reply2:
-        messages.append(TextSendMessage(text=reply2))
-
-    line_bot_api.reply_message(event.reply_token, messages)
-
-
-@app.route("/", methods=["GET"])
-def health_check():
-    return "れんげつBot稼働中"
+    payload = {
+        "userId": user_id,
+        "name": user_name,
+        "message": message,
+        "premium": is_premium
+    }
+    response = requests.post(url, headers=headers, data=json.dumps(payload))
+    return response.text
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(port=8000)
