@@ -1,48 +1,53 @@
 from flask import Flask, request, abort
-from linebot import LineBotApi, WebhookHandler
-from linebot.models import TextSendMessage
 import requests
 import json
 import os
+from linebot import LineBotApi, WebhookHandler
+from linebot.models import MessageEvent, TextMessage, TextSendMessage
 
-# === 環境変数（Render側で設定する） ===
-LINE_CHANNEL_ACCESS_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN", "ここにチャネルアクセストークンを直書きしてもOK")
-LINE_CHANNEL_SECRET = os.environ.get("LINE_CHANNEL_SECRET", "ここにシークレットを直書きしてもOK")
+app = Flask(__name__)
+
+# 環境変数から取得
+LINE_CHANNEL_ACCESS_TOKEN = os.environ["LINE_CHANNEL_ACCESS_TOKEN"]
+LINE_CHANNEL_SECRET = os.environ["LINE_CHANNEL_SECRET"]
 
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
-app = Flask(__name__)
+@app.route("/", methods=['GET'])
+def index():
+    return "れんげつBot is running.", 200
 
 @app.route("/callback", methods=['POST'])
 def callback():
+    signature = request.headers['X-Line-Signature']
     body = request.get_data(as_text=True)
+    
     try:
-        event = json.loads(body)["events"][0]
-        user_id = event["source"]["userId"]
-        message = event["message"]["text"]
-        reply_token = event["replyToken"]
-        user_name = "れんげつ様"
-        is_premium = False
-
-        # GASに送信して応答をもらう
-        gas_response = send_to_gas(user_id, user_name, message, is_premium)
-        print("GAS Response:", gas_response)
-
-        # LINEに返信
-        line_bot_api.reply_message(
-            reply_token,
-            TextSendMessage(text=gas_response)
-        )
-
+        handler.handle(body, signature)
     except Exception as e:
-        print("Error:", e)
+        print("Error in handler:", e)
         abort(400)
-
     return 'OK'
 
+@handler.add(MessageEvent, message=TextMessage)
+def handle_message(event):
+    user_id = event.source.user_id
+    message_text = event.message.text
+    user_name = "れんげつ様"  # 初期名
+    is_premium = False       # 初期はFalse、GAS側で管理
+
+    # GASへ送信
+    gas_response = send_to_gas(user_id, user_name, message_text, is_premium)
+    
+    # LINEに返信
+    line_bot_api.reply_message(
+        event.reply_token,
+        TextSendMessage(text=gas_response)
+    )
+
 def send_to_gas(user_id, user_name, message, is_premium):
-    url = "https://script.google.com/macros/s/AKfycbxHRdbQRJxfLD4NVzsfO9fOjeg68ujCfVczU9zTo-zfq2FXclDA_yMgR1tRLZTPXFHt/exec"
+    url = "https://script.google.com/macros/s/AKfycbya-0mNXSOhv22TfZlpuP0yuhwmo55QRqUcmF7iVtH5rI9zwL9t2UaIlbkHFtHR6aFs/exec"
     headers = {
         "Content-Type": "application/json"
     }
