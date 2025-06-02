@@ -42,7 +42,7 @@ def callback():
     return 'OK'
 
 def send_to_gas(user_id, user_name, message, is_premium):
-    url = "https://script.google.com/macros/s/AKfycbya-0mNXSOhv22TfZlpuP0yuhwmo55QRqUcmF7iVtH5rI9zwL9t2UaIlbkHFtHR6aFs/exec"
+    url = "https://script.google.com/macros/s/AKfycbxHRdbQRJxfLD4NVzsfO9fOjeg68ujCfVczU9zTo-zfq2FXclDA_yMgR1tRLZTPXFHt/exec"
     headers = {
         "Content-Type": "application/json"
     }
