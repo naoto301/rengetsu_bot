@@ -18,6 +18,8 @@ def callback():
         gas_response = send_to_gas(user_id, user_name, message, is_premium)
         print("GAS Response:", gas_response)
 
+        return gas_response
+    
     except Exception as e:
         print("Error:", e)
         abort(400)
@@ -25,7 +27,7 @@ def callback():
     return 'OK'
 
 def send_to_gas(user_id, user_name, message, is_premium):
-    url = "https://script.google.com/macros/s/AKfycbw8ZEOnqZHVcqfinlhxu4eMAs_Pdbwsapym6RFcAhGRod0_VcZVgspUzf70BgS0xAXg/exec"
+    url = "https://script.google.com/macros/s/AKfycbya-0mNXSOhv22TfZlpuP0yuhwmo55QRqUcmF7iVtH5rI9zwL9t2UaIlbkHFtHR6aFs/exec"
     headers = {
         "Content-Type": "application/json"
     }
